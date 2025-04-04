@@ -150,7 +150,7 @@ if __name__ == "__main__":
     beam_options = PipelineOptions(
         beam_args,
         save_main_session=True,
-        streaming=True,
+        streaming=False,
     )
 
     handler = GemmaPytorchModelHandler(
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     with beam.Pipeline(options=beam_options) as pipeline:
         _ = (
             pipeline
-            | "Subscribe to Pub/Sub" >> beam.io.ReadFromPubSub(subscription=args.messages_subscription)
+            | "Create Elements" >> beam.Create(["Tell the the sentiment of the following sentence: I like pineapple on pizza."])
             | "Decode" >> beam.Map(lambda msg: msg.decode("utf-8"))
             | "RunInference Gemma" >> RunInference(handler)
             | "Format output" >> beam.Map(

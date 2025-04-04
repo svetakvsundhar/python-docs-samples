@@ -42,5 +42,20 @@ COPY custom_model_gemma.py custom_model_gemma.py
 
 ENV FLEX_TEMPLATE_PYTHON_PY_FILE="custom_model_gemma.py"
 
+# Configure the environment to access TPU device
+
+ENV TPU_SKIP_MDS_QUERY=1
+ENV TPU_HOST_BOUNDS=1,1,1
+ENV TPU_WORKER_HOSTNAMES=localhost
+ENV TPU_WORKER_ID=0
+
+# Configure the environment for the chosen accelerator.
+# Adjust according to the accelerator you use.
+ENV TPU_ACCELERATOR_TYPE=v5litepod-1
+ENV TPU_CHIPS_PER_HOST_BOUNDS=1,1,1
+
+# Install TPU software stack.
+RUN pip install jax[tpu] apache-beam[gcp]==2.59.0  -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+
 # Set the entrypoint to Apache Beam SDK launcher.
 ENTRYPOINT ["/opt/apache/beam/boot"]
