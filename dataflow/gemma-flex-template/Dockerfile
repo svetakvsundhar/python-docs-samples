@@ -30,32 +30,27 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy SDK entrypoint binary from Apache Beam image, which makes it possible to
 # use the image as SDK container image.
 # The Beam version should match the version specified in requirements.txt
-COPY --from=apache/beam_python3.10_sdk:2.62.0 /opt/apache/beam /opt/apache/beam
+COPY --from=apache/beam_python3.11_sdk:2.62.0 /opt/apache/beam /opt/apache/beam
 
 # Copy Flex Template launcher binary from the launcher image, which makes it
 # possible to use the image as a Flex Template base image.
-COPY --from=gcr.io/dataflow-templates-base/python310-template-launcher-base:latest /opt/google/dataflow/python_template_launcher /opt/google/dataflow/python_template_launcher
+COPY --from=gcr.io/dataflow-templates-base/python311-template-launcher-base:latest /opt/google/dataflow/python_template_launcher /opt/google/dataflow/python_template_launcher
 
 # Copy the model directory downloaded from Kaggle and the pipeline code.
 COPY pytorch_model pytorch_model
 COPY custom_model_gemma.py custom_model_gemma.py
 
+# Set environment variables.
 ENV FLEX_TEMPLATE_PYTHON_PY_FILE="custom_model_gemma.py"
-
-# Configure the environment to access TPU device
-
 ENV TPU_SKIP_MDS_QUERY=1
 ENV TPU_HOST_BOUNDS=1,1,1
 ENV TPU_WORKER_HOSTNAMES=localhost
 ENV TPU_WORKER_ID=0
+ENV TPU_ACCELERATOR_TYPE=v6e-1
+# update based on topology
+ENV TPU_CHIPS_PER_HOST_BOUNDS=2,2,1
 
-# Configure the environment for the chosen accelerator.
-# Adjust according to the accelerator you use.
-ENV TPU_ACCELERATOR_TYPE=v5litepod-1
-ENV TPU_CHIPS_PER_HOST_BOUNDS=1,1,1
-
-# Install TPU software stack.
-RUN pip install jax[tpu] apache-beam[gcp]==2.59.0  -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+RUN pip install jax[tpu] apache-beam[gcp]==2.62.0  -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
 
 # Set the entrypoint to Apache Beam SDK launcher.
 ENTRYPOINT ["/opt/apache/beam/boot"]
