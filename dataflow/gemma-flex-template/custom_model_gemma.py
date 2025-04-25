@@ -27,6 +27,7 @@ from gemma.config import get_config_for_7b
 from gemma.model import GemmaForCausalLM
 
 import torch
+import torch_xla.core.xla_model as xm
 
 
 class GemmaPytorchModelHandler(ModelHandler[str, PredictionResult, GemmaForCausalLM]):
@@ -81,8 +82,11 @@ class GemmaPytorchModelHandler(ModelHandler[str, PredictionResult, GemmaForCausa
         """Loads and initializes a model for processing."""
         torch.set_default_dtype(self._model_config.get_dtype())
         model = GemmaForCausalLM(self._model_config)
+        logging.info(model)
         model.load_weights(self._checkpoint_path)
+        logging.info("weights loaded")
         model = model.to(self._device).eval()
+        logging.info("evaluated")
         return model
 
     def run_inference(
@@ -101,25 +105,15 @@ class GemmaPytorchModelHandler(ModelHandler[str, PredictionResult, GemmaForCausa
         Returns:
           An Iterable of type PredictionResult.
         """
-        inputs = model.tokenizer(batch, return_tensors="pt", padding=True, truncation=True).to(self._device)
-        with torch.no_grad():
-            outputs = model.generate(**inputs)
-        predictions = [model.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+        logging.info(batch)
+        logging.info(self._device)
+        result = model.generate(prompts=batch, device=self._device)
+        predictions = [result]
         return [PredictionResult(x, y) for x, y in zip(batch, predictions)]
 
 
 if __name__ == "__main__":
     import argparse
-    import apache_beam as beam
-    from apache_beam.options.pipeline_options import PipelineOptions
-    import json
-    import logging
-    import torch_xla.core.xla_model as xm
-    import torch_xla.distributed.parallel_loader as pl
-
-    from gemma.config import get_config_for_2b
-    from gemma.config import get_config_for_7b
-    from gemma.model import GemmaForCausalLM
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -148,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--device",
         required=False,
-        default="TPU",
+        default="cpu",
         help="device to run the model on",
     )
 
@@ -161,10 +155,10 @@ if __name__ == "__main__":
         beam_args,
         save_main_session=True,
         streaming=False,
-        # Options for running on TPU in Dataflow
         worker_accelerator="TPU",
         num_accelerators=8,  # Adjust based on the number of TPU cores you want to use
         use_tpu=True,
+        runner='DirectRunner',  # Explicitly set the runner
     )
 
     handler = GemmaPytorchModelHandler(
@@ -177,7 +171,7 @@ if __name__ == "__main__":
     with beam.Pipeline(options=beam_options) as pipeline:
         _ = (
                 pipeline
-                | "Create Elements" >> beam.Create(["Tell me the sentiment of the following sentence: I like pineapple on pizza."])
+                | "Create Elements" >> beam.Create([b"Tell me the sentiment of the following sentence: I like pineapple on pizza."])
                 | "Decode" >> beam.Map(lambda msg: msg.decode("utf-8"))
                 | "RunInference Gemma" >> RunInference(handler)
                 | "Format output" >> beam.Map(lambda response: json.dumps({"input": response.example, "outputs": response.inference}))

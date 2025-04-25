@@ -40,7 +40,6 @@ COPY --from=gcr.io/dataflow-templates-base/python311-template-launcher-base:late
 COPY pytorch_model pytorch_model
 COPY custom_model_gemma.py custom_model_gemma.py
 
-# Set environment variables.
 ENV FLEX_TEMPLATE_PYTHON_PY_FILE="custom_model_gemma.py"
 ENV TPU_SKIP_MDS_QUERY=1
 ENV TPU_HOST_BOUNDS=1,1,1
@@ -51,6 +50,6 @@ ENV TPU_ACCELERATOR_TYPE=v6e-1
 ENV TPU_CHIPS_PER_HOST_BOUNDS=2,2,1
 
 RUN pip install jax[tpu] apache-beam[gcp]==2.62.0  -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
-
+RUN pip install torch~=2.6.0 torch_xla[tpu]~=2.6.0 torchvision -f https://storage.googleapis.com/libtpu-releases/index.html
 # Set the entrypoint to Apache Beam SDK launcher.
 ENTRYPOINT ["/opt/apache/beam/boot"]
